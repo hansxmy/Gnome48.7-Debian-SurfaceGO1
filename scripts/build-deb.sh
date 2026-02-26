@@ -42,6 +42,7 @@ cd "$SRC_DIR"
 cp -f "$ROOT_DIR/overrides/js/ui/overview.js" js/ui/overview.js
 cp -f "$ROOT_DIR/overrides/js/ui/overviewControls.js" js/ui/overviewControls.js
 cp -f "$ROOT_DIR/overrides/js/ui/dash.js" js/ui/dash.js
+cp -f "$ROOT_DIR/overrides/js/ui/panel.js" js/ui/panel.js
 cp -f "$ROOT_DIR/overrides/js/ui-root/main.js" js/ui/main.js
 cp -f "$ROOT_DIR/overrides/js/ui-root/windowManager.js" js/ui/windowManager.js
 
