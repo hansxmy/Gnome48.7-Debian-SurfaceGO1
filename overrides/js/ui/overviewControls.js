@@ -375,7 +375,7 @@ class ControlsManager extends St.Widget {
 
         this.add_child(this._searchEntryBin);
         this.add_child(this._appDisplay);
-        if (this.dash.get_parent() !== this)
+        if (this.dash.get_parent() === null)
             this.add_child(this.dash);
         this.add_child(this._searchController);
         this.add_child(this._thumbnailsBox);
