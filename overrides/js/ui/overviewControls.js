@@ -651,6 +651,12 @@ class ControlsManager extends St.Widget {
 
         const checked = this.dash.showAppsButton.checked;
 
+        if (!Main.overview.visible) {
+            if (checked)
+                Main.overview.show(ControlsState.APP_GRID);
+            return;
+        }
+
         const value = checked
             ? ControlsState.APP_GRID : ControlsState.WINDOW_PICKER;
         this._stateAdjustment.remove_transition('value');

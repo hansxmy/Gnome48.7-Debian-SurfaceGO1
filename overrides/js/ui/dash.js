@@ -53,9 +53,11 @@ class DashIcon extends AppDisplay.AppIcon {
             eventType === Clutter.EventType.TOUCH_UPDATE ||
             eventType === Clutter.EventType.TOUCH_END;
 
-        const effectiveButton = isTouchEvent
+        let effectiveButton = isTouchEvent
             ? Clutter.BUTTON_PRIMARY
             : button;
+        if (!effectiveButton)
+            effectiveButton = Clutter.BUTTON_PRIMARY;
         const modifiers = event ? event.get_state() : 0;
 
         const isMiddleButton =
@@ -86,6 +88,13 @@ class DashIcon extends AppDisplay.AppIcon {
                     ? windows[(focusedIndex + 1) % windows.length]
                     : windows[0];
                 Main.activateWindow(nextWindow);
+            } else if (windows.length === 1) {
+                const targetWindow = windows[0];
+                const focusedWindow = global.display.focus_window;
+                if (focusedWindow === targetWindow && !targetWindow.minimized)
+                    targetWindow.minimize();
+                else
+                    Main.activateWindow(targetWindow);
             } else {
                 this.app.activate();
             }

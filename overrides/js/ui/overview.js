@@ -118,6 +118,7 @@ export class Overview extends Signals.EventEmitter {
         this._persistentDash = null;
         this._persistentDashContainer = null;
         this._persistentDashShown = false;
+        this._trackedPersistentDashWindows = new Set();
 
         Main.sessionMode.connect('updated', this._sessionUpdated.bind(this));
         this._sessionUpdated();
@@ -260,7 +261,7 @@ export class Overview extends Signals.EventEmitter {
         this._persistentDash = new Dash.Dash();
         this._persistentDashContainer = new St.Widget({
             name: 'persistentDashContainer',
-            reactive: false,
+            reactive: true,
             layout_manager: new Clutter.BinLayout(),
         });
         this._persistentDashContainer.add_constraint(
@@ -285,6 +286,10 @@ export class Overview extends Signals.EventEmitter {
             () => this._updatePersistentDashVisibility(),
             this._persistentDashContainer);
         global.display.connectObject(
+            'window-created',
+            (_display, metaWindow) => this._trackWindowForPersistentDash(metaWindow),
+            this._persistentDashContainer);
+        global.display.connectObject(
             'notify::focus-window',
             () => this._updatePersistentDashVisibility(),
             this._persistentDashContainer);
@@ -305,8 +310,51 @@ export class Overview extends Signals.EventEmitter {
             () => this._updatePersistentDashVisibility(),
             this._persistentDashContainer);
 
+        for (const actor of global.get_window_actors()) {
+            const metaWindow = actor.get_meta_window();
+            this._trackWindowForPersistentDash(metaWindow);
+        }
+
         this._updatePersistentDashLayout();
         this._updatePersistentDashVisibility(false);
+    }
+
+    _trackWindowForPersistentDash(metaWindow) {
+        if (!metaWindow || !this._persistentDashContainer)
+            return;
+        if (this._trackedPersistentDashWindows.has(metaWindow))
+            return;
+
+        this._trackedPersistentDashWindows.add(metaWindow);
+
+        metaWindow.connectObject(
+            'position-changed',
+            () => this._updatePersistentDashVisibility(),
+            this._persistentDashContainer);
+        metaWindow.connectObject(
+            'size-changed',
+            () => this._updatePersistentDashVisibility(),
+            this._persistentDashContainer);
+        metaWindow.connectObject(
+            'workspace-changed',
+            () => this._updatePersistentDashVisibility(),
+            this._persistentDashContainer);
+        metaWindow.connectObject(
+            'notify::minimized',
+            () => this._updatePersistentDashVisibility(),
+            this._persistentDashContainer);
+        metaWindow.connectObject(
+            'notify::maximized-horizontally',
+            () => this._updatePersistentDashVisibility(),
+            this._persistentDashContainer);
+        metaWindow.connectObject(
+            'notify::maximized-vertically',
+            () => this._updatePersistentDashVisibility(),
+            this._persistentDashContainer);
+        metaWindow.connectObject(
+            'unmanaged',
+            () => this._trackedPersistentDashWindows.delete(metaWindow),
+            this._persistentDashContainer);
     }
 
     _destroyPersistentDash() {
@@ -319,6 +367,7 @@ export class Overview extends Signals.EventEmitter {
         this._persistentDash = null;
         this._persistentDashContainer = null;
         this._persistentDashShown = false;
+        this._trackedPersistentDashWindows.clear();
     }
 
     _updatePersistentDashLayout() {
