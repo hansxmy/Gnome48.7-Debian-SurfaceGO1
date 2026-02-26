@@ -18,7 +18,7 @@ jobs:
 
       - name: Build .deb
         env:
-          RUN_TESTS: '0'
+          RUN_TESTS: '1'
         run: |
           chmod +x scripts/build-deb.sh
           ./scripts/build-deb.sh

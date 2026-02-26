@@ -6,7 +6,7 @@ set -euo pipefail
 DSC_URL="${GNOME_SHELL_DSC_URL:-https://deb.debian.org/debian/pool/main/g/gnome-shell/gnome-shell_48.7-0+deb13u1.dsc}"
 LOCAL_SUFFIX="${LOCAL_SUFFIX:-+dock1}"
 DISTRO="${DISTRO:-trixie}"
-RUN_TESTS="${RUN_TESTS:-0}"
+RUN_TESTS="${RUN_TESTS:-1}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK_DIR="$ROOT_DIR/work"
@@ -54,9 +54,9 @@ mk-build-deps --install --remove \
   debian/control
 
 if [ "$RUN_TESTS" = "1" ]; then
-  echo "RUN_TESTS=1，执行完整测试构建。"
+  echo "RUN_TESTS=1，执行完整测试构建（先过测试再产包）。"
 else
-  echo "RUN_TESTS=0，默认跳过测试以保证 CI 稳定产包。"
+  echo "RUN_TESTS=0，按需跳过测试。"
   export DEB_BUILD_OPTIONS="${DEB_BUILD_OPTIONS:-nocheck}"
 fi
 

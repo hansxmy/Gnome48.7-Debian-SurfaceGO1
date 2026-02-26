@@ -20,8 +20,8 @@
 
 ## CI 产包说明
 
-- 当前 workflow 默认 `RUN_TESTS=0`，会跳过上游自动化测试，目标是稳定产出完整 `gnome-shell` 二进制包（`gnome-shell`/`gnome-shell-common` 等）。
-- 如果你想在 CI 里同时跑测试，可把 workflow 的 `RUN_TESTS` 改为 `1`。
+- 当前 workflow 默认 `RUN_TESTS=1`，会先跑上游自动化测试，再产出完整 `gnome-shell` 二进制包（`gnome-shell`/`gnome-shell-common` 等）。
+- 如果你临时只想快速产包，可把 workflow 的 `RUN_TESTS` 改为 `0`。
 
 ## Debian 安装与回滚
 
