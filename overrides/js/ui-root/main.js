@@ -113,6 +113,7 @@ Gio._promisify(Gio.File.prototype, 'touch_async');
 
 let _remoteAccessInhibited = false;
 let _workspaceSettings = null;
+let _singleWorkspaceEnabled = false;
 
 function _enforceSingleWorkspaceCount() {
     if (!FORCE_SINGLE_WORKSPACE_MODE)
@@ -138,6 +139,10 @@ function _enableSingleWorkspaceMode() {
     if (!FORCE_SINGLE_WORKSPACE_MODE)
         return;
 
+    if (_singleWorkspaceEnabled)
+        return;
+    _singleWorkspaceEnabled = true;
+
     if (!_workspaceSettings)
         _workspaceSettings = new Gio.Settings({schema_id: 'org.gnome.mutter'});
 
@@ -162,6 +167,7 @@ function _enableSingleWorkspaceMode() {
         _enforceSingleWorkspaceCount();
         return GLib.SOURCE_REMOVE;
     });
+    // Source is one-shot (SOURCE_REMOVE), no need to track ID
 }
 
 function _sessionUpdated() {

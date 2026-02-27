@@ -34,6 +34,8 @@ export const ControlsState = {
     APP_GRID: 2,
 };
 
+const CONTROLS_STATES = Object.values(ControlsState);
+
 const ControlsManagerLayout = GObject.registerClass(
 class ControlsManagerLayout extends Clutter.LayoutManager {
     _init(searchEntry, appDisplay, workspacesDisplay, workspacesThumbnails,
@@ -215,7 +217,7 @@ class ControlsManagerLayout extends Clutter.LayoutManager {
         const transitionParams = this._stateAdjustment.getStateTransitionParams();
 
         // Update cached boxes
-        for (const state of Object.values(ControlsState)) {
+        for (const state of CONTROLS_STATES) {
             this._cachedWorkspaceBoxes.set(
                 state, this._computeWorkspacesBoxForState(state, ...params));
         }
@@ -827,6 +829,8 @@ class ControlsManager extends St.Widget {
             for (const mask of this._cornerMasks)
                 mask.destroy();
             this._cornerMasks = [];
+            if (this.layout_manager)
+                this.layout_manager._cornerMasks = null;
         }
         delete this._thumbnailsBox;
         delete this._workspacesDisplay;
@@ -926,7 +930,7 @@ class ControlsManager extends St.Widget {
         this._stateAdjustment.ease(target, {
             duration,
             mode: Clutter.AnimationMode.EASE_OUT_CUBIC,
-            onComplete,
+            onStopped: onComplete,
         });
 
         this._stateAdjustment.gestureInProgress = false;

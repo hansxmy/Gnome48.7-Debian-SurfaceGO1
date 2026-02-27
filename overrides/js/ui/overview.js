@@ -317,6 +317,12 @@ export class Overview extends Signals.EventEmitter {
             () => this._updatePersistentDashVisibility(),
             this._persistentDashContainer);
 
+        // Invalidate cached dash rect when dash content changes (favorites added/removed)
+        this._persistentDash.connectObject(
+            'notify::height',
+            () => { this._cachedDashRect = null; },
+            this._persistentDashContainer);
+
         for (const actor of global.get_window_actors()) {
             const metaWindow = actor.get_meta_window();
             this._trackWindowForPersistentDash(metaWindow);
