@@ -141,8 +141,18 @@ function _enableSingleWorkspaceMode() {
     if (!_workspaceSettings)
         _workspaceSettings = new Gio.Settings({schema_id: 'org.gnome.mutter'});
 
-    if (_workspaceSettings.get_boolean('dynamic-workspaces'))
-        _workspaceSettings.set_boolean('dynamic-workspaces', false);
+    _workspaceSettings.set_boolean('dynamic-workspaces', false);
+
+    // Guard against external tools (gnome-tweaks, dconf) re-enabling
+    _workspaceSettings.connect('changed::dynamic-workspaces', () => {
+        if (_workspaceSettings.get_boolean('dynamic-workspaces'))
+            _workspaceSettings.set_boolean('dynamic-workspaces', false);
+    });
+
+    // Also enforce num-workspaces = 1 in WM preferences
+    const wmPrefs = new Gio.Settings({schema_id: 'org.gnome.desktop.wm.preferences'});
+    if (wmPrefs.get_int('num-workspaces') !== 1)
+        wmPrefs.set_int('num-workspaces', 1);
 
     const workspaceManager = global.workspace_manager;
     workspaceManager.connect('notify::n-workspaces',

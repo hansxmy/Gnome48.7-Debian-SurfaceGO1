@@ -88,12 +88,14 @@ class ControlsManagerLayout extends Clutter.LayoutManager {
             workspaceBox.set_size(...this._workAreaBox.get_size());
             break;
         case ControlsState.WINDOW_PICKER:
+            // Workspace fills the full available height — the dash floats on
+            // top at the bottom (z-ordered above the workspace display) so
+            // the overview feels larger, matching the user's preference.
             workspaceBox.set_origin(0,
                 startY + searchHeight + Math.round(spacing * THUMBNAILS_SPACING_ADJUSTMENT_TOP) +
                 thumbnailsHeight + Math.round(spacing * THUMBNAILS_SPACING_ADJUSTMENT_BOTTOM) * expandFraction);
             workspaceBox.set_size(width,
                 height -
-                dashHeight - spacing -
                 searchHeight - Math.round(spacing * THUMBNAILS_SPACING_ADJUSTMENT_TOP) -
                 thumbnailsHeight - Math.round(spacing * THUMBNAILS_SPACING_ADJUSTMENT_BOTTOM) * expandFraction);
             break;
@@ -382,12 +384,14 @@ class ControlsManager extends St.Widget {
             this._stateAdjustment);
         this._appDisplay = new AppDisplay.AppDisplay();
 
+        // Z-order: workspace below dash so the dash floats visibly
+        // on top of the full-height workspace preview.
         this.add_child(this._appDisplay);
+        this.add_child(this._workspacesDisplay);
         if (this.dash.get_parent() === null)
             this.add_child(this.dash);
         this.add_child(this._searchController);
         this.add_child(this._thumbnailsBox);
-        this.add_child(this._workspacesDisplay);
 
         this.layout_manager = new ControlsManagerLayout(
             null,  // no search entry
@@ -749,7 +753,10 @@ class ControlsManager extends St.Widget {
         if (!this._usesSharedDash)
             delete this.dash;
         delete this._searchController;
-        delete this._dummySearchEntry;
+        if (this._dummySearchEntry) {
+            this._dummySearchEntry.destroy();
+            this._dummySearchEntry = null;
+        }
         delete this._thumbnailsBox;
         delete this._workspacesDisplay;
     }

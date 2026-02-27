@@ -121,6 +121,7 @@ export class Overview extends Signals.EventEmitter {
         this._persistentDash = null;
         this._persistentDashContainer = null;
         this._persistentDashShown = false;
+        this._persistentDashIdleId = 0;
         this._trackedPersistentDashWindows = new Set();
 
         Main.sessionMode.connect('updated', this._sessionUpdated.bind(this));
@@ -351,6 +352,11 @@ export class Overview extends Signals.EventEmitter {
         // The dash is shared with ControlsManager — destroying it here
         // would leave ControlsManager with a disposed reference, causing
         // "impossible to access" errors after suspend/resume cycles.
+        if (this._persistentDashIdleId) {
+            GLib.source_remove(this._persistentDashIdleId);
+            this._persistentDashIdleId = 0;
+        }
+
         if (this._persistentDash?.get_parent() === this._persistentDashContainer)
             this._persistentDashContainer.remove_child(this._persistentDash);
 
@@ -495,7 +501,8 @@ export class Overview extends Signals.EventEmitter {
         // Debounce rapid-fire signal updates into a single idle callback
         if (animate && !this._persistentDashVisibilityQueued) {
             this._persistentDashVisibilityQueued = true;
-            GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+            this._persistentDashIdleId = GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+                this._persistentDashIdleId = 0;
                 this._persistentDashVisibilityQueued = false;
                 this._applyPersistentDashVisibility(true);
                 return GLib.SOURCE_REMOVE;
