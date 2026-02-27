@@ -17,7 +17,7 @@ import * as WindowManager from './windowManager.js';
 import * as WorkspaceThumbnail from './workspaceThumbnail.js';
 import * as WorkspacesView from './workspacesView.js';
 
-export const SMALL_WORKSPACE_RATIO = 0.28;
+export const SMALL_WORKSPACE_RATIO = 0.364;
 const DASH_MAX_HEIGHT_RATIO = 0.128;
 const VERTICAL_SPACING_RATIO = 0.02;
 const THUMBNAILS_SPACING_ADJUSTMENT_TOP = 0.6;
@@ -231,6 +231,27 @@ class ControlsManagerLayout extends Clutter.LayoutManager {
 
         this._workspacesDisplay.allocate(workspacesBox);
 
+        // Corner masks for rounded workspace preview in APP_GRID
+        if (this._cornerMasks) {
+            const initR = transitionParams.initialState === ControlsState.APP_GRID ? 24 : 0;
+            const finalR = transitionParams.finalState === ControlsState.APP_GRID ? 24 : 0;
+            const r = Math.round(
+                Util.lerp(initR, finalR, transitionParams.progress));
+            if (r > 0) {
+                const [wx, wy] = workspacesBox.get_origin();
+                const [ww, wh] = workspacesBox.get_size();
+                const corners = [
+                    [wx, wy], [wx + ww - r, wy],
+                    [wx, wy + wh - r], [wx + ww - r, wy + wh - r],
+                ];
+                for (let i = 0; i < 4; i++) {
+                    childBox.set_origin(corners[i][0], corners[i][1]);
+                    childBox.set_size(r, r);
+                    this._cornerMasks[i].allocate(childBox);
+                }
+            }
+        }
+
         // AppDisplay
         if (this._appDisplay.visible) {
             const workspaceAppGridBox =
@@ -384,10 +405,33 @@ class ControlsManager extends St.Widget {
             this._stateAdjustment);
         this._appDisplay = new AppDisplay.AppDisplay();
 
+        // Corner-mask overlay widgets: four tiny actors positioned at
+        // the workspace preview corners in APP_GRID state.  Each paints
+        // a quarter-circle of the overview background colour, visually
+        // rounding the rectangular preview without a GPU shader.
+        this._cornerMasks = [];
+        const cornerBorderProps = [
+            'border-top-left-radius',
+            'border-top-right-radius',
+            'border-bottom-left-radius',
+            'border-bottom-right-radius',
+        ];
+        for (let i = 0; i < 4; i++) {
+            const mask = new St.Widget({
+                reactive: false,
+                can_focus: false,
+                visible: false,
+            });
+            mask._cornerStyleProp = cornerBorderProps[i];
+            this._cornerMasks.push(mask);
+        }
+
         // Z-order: workspace below dash so the dash floats visibly
         // on top of the full-height workspace preview.
         this.add_child(this._appDisplay);
         this.add_child(this._workspacesDisplay);
+        for (const mask of this._cornerMasks)
+            this.add_child(mask);
         if (this.dash.get_parent() === null)
             this.add_child(this.dash);
         this.add_child(this._searchController);
@@ -401,6 +445,8 @@ class ControlsManager extends St.Widget {
             this._searchController,
             this.dash,
             this._stateAdjustment);
+
+        this.layout_manager._cornerMasks = this._cornerMasks;
 
         this.dash.showAppsButton.connectObject('notify::checked',
             () => this._onShowAppsButtonToggled(), this);
@@ -454,7 +500,7 @@ class ControlsManager extends St.Widget {
         }, this);
 
         // connect_after to give search controller first dibs on the event
-        global.stage.connect_after('key-press-event', (actor, event) => {
+        this._stageKeyPressId = global.stage.connect_after('key-press-event', (actor, event) => {
             if (this._searchController.searchActive)
                 return Clutter.EVENT_PROPAGATE;
 
@@ -648,7 +694,10 @@ class ControlsManager extends St.Widget {
             this._workspacesDisplay.fitModeAdjustment.value = fitMode;
         }
 
-        // Rounded corners on workspace preview in APP_GRID state
+        // Rounded corners on workspace preview in APP_GRID state.
+        // Corner-mask overlay widgets are used instead of CSS on
+        // _workspacesDisplay because clip_to_allocation + border-radius
+        // does not clip child content to a rounded rectangle in St.
         const initialRadius =
             params.initialState === ControlsState.APP_GRID ? 24 : 0;
         const finalRadius =
@@ -658,12 +707,17 @@ class ControlsManager extends St.Widget {
         if (radius !== this._lastCornerRadius) {
             this._lastCornerRadius = radius;
             if (radius > 0) {
-                this._workspacesDisplay.set({clip_to_allocation: true});
-                this._workspacesDisplay.style =
-                    `border-radius: ${radius}px;`;
+                for (const mask of this._cornerMasks) {
+                    mask.style =
+                        `background-color: rgba(18,20,25,0.88); ` +
+                        `${mask._cornerStyleProp}: ${radius}px;`;
+                    mask.visible = true;
+                }
             } else {
-                this._workspacesDisplay.set({clip_to_allocation: false});
-                this._workspacesDisplay.style = null;
+                for (const mask of this._cornerMasks) {
+                    mask.visible = false;
+                    mask.style = null;
+                }
             }
         }
 
@@ -697,13 +751,17 @@ class ControlsManager extends St.Widget {
             return;
         }
 
-        const value = checked
-            ? ControlsState.APP_GRID : ControlsState.WINDOW_PICKER;
-        this._stateAdjustment.remove_transition('value');
-        this._stateAdjustment.ease(value, {
-            duration: SIDE_CONTROLS_ANIMATION_TIME,
-            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-        });
+        if (checked) {
+            // In overview (WINDOW_PICKER) → transition to APP_GRID
+            this._stateAdjustment.remove_transition('value');
+            this._stateAdjustment.ease(ControlsState.APP_GRID, {
+                duration: SIDE_CONTROLS_ANIMATION_TIME,
+                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            });
+        } else {
+            // In APP_GRID → go directly to desktop, skip WINDOW_PICKER
+            Main.overview.hide();
+        }
     }
 
     _toggleAppsPage() {
@@ -718,9 +776,13 @@ class ControlsManager extends St.Widget {
     _shiftState(direction) {
         let {currentState, finalState} = this._stateAdjustment.getStateTransitionParams();
 
-        if (direction === Meta.MotionDirection.DOWN)
-            finalState = Math.max(finalState - 1, ControlsState.HIDDEN);
-        else if (direction === Meta.MotionDirection.UP)
+        if (direction === Meta.MotionDirection.DOWN) {
+            // From APP_GRID, skip WINDOW_PICKER → go straight to desktop
+            if (finalState >= ControlsState.APP_GRID)
+                finalState = ControlsState.HIDDEN;
+            else
+                finalState = Math.max(finalState - 1, ControlsState.HIDDEN);
+        } else if (direction === Meta.MotionDirection.UP)
             finalState = Math.min(finalState + 1, ControlsState.APP_GRID);
 
         if (finalState === currentState)
@@ -749,6 +811,10 @@ class ControlsManager extends St.Widget {
     }
 
     _onDestroy() {
+        if (this._stageKeyPressId) {
+            global.stage.disconnect(this._stageKeyPressId);
+            this._stageKeyPressId = 0;
+        }
         delete this._appDisplay;
         if (!this._usesSharedDash)
             delete this.dash;
@@ -756,6 +822,11 @@ class ControlsManager extends St.Widget {
         if (this._dummySearchEntry) {
             this._dummySearchEntry.destroy();
             this._dummySearchEntry = null;
+        }
+        if (this._cornerMasks) {
+            for (const mask of this._cornerMasks)
+                mask.destroy();
+            this._cornerMasks = [];
         }
         delete this._thumbnailsBox;
         delete this._workspacesDisplay;
@@ -846,8 +917,10 @@ class ControlsManager extends St.Widget {
         if (target === ControlsState.HIDDEN)
             this.prepareToLeaveOverview();
 
+        this._ignoreShowAppsButtonToggle = true;
         this.dash.showAppsButton.checked =
             target === ControlsState.APP_GRID;
+        this._ignoreShowAppsButtonToggle = false;
 
         this._stateAdjustment.remove_transition('value');
         this._stateAdjustment.ease(target, {
