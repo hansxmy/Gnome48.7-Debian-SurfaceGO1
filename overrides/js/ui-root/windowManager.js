@@ -16,7 +16,7 @@ import * as InhibitShortcutsDialog from './inhibitShortcutsDialog.js';
 import * as ModalDialog from './modalDialog.js';
 import * as WindowMenu from './windowMenu.js';
 import * as PadOsd from './padOsd.js';
-import * as EdgeDragAction from './edgeDragAction.js';
+// EdgeDragAction import removed — unfullscreen gesture disabled
 import * as CloseDialog from './closeDialog.js';
 import * as SwitchMonitor from './switchMonitor.js';
 import * as IBusManager from '../misc/ibusManager.js';
@@ -456,7 +456,7 @@ class TilePreview extends St.Widget {
             opacity: 0,
             duration: WINDOW_ANIMATION_TIME,
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-            onComplete: () => this._reset(),
+            onStopped: () => this._reset(),
         });
     }
 
@@ -875,20 +875,8 @@ export class WindowManager {
             Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW,
             this._openNewApplicationWindow.bind(this));
 
-        global.stage.connect('scroll-event', (stage, event) => {
-            const allowedModes = Shell.ActionMode.NORMAL;
-            if ((allowedModes & Main.actionMode) === 0)
-                return Clutter.EVENT_PROPAGATE;
-
-            if (this._workspaceAnimation.canHandleScrollEvent(event))
-                return Clutter.EVENT_PROPAGATE;
-
-            const {compositorModifiers} = global.display;
-            if ((event.get_state() & compositorModifiers) !== compositorModifiers)
-                return Clutter.EVENT_PROPAGATE;
-
-            return this.handleWorkspaceScroll(event);
-        });
+        // Single-workspace mode: disable scroll-based workspace switching entirely
+        global.stage.connect('scroll-event', () => Clutter.EVENT_PROPAGATE);
 
         global.display.connect('show-resize-popup', this._showResizePopup.bind(this));
         global.display.connect('show-pad-osd', this._showPadOsd.bind(this));
@@ -938,25 +926,11 @@ export class WindowManager {
         if (Main.sessionMode.hasWorkspaces)
             this._workspaceTracker = new WorkspaceTracker(this);
 
-        let mode = Shell.ActionMode.NORMAL;
-        let topDragAction = new EdgeDragAction.EdgeDragAction(St.Side.TOP, mode);
-        topDragAction.connect('activated',  () => {
-            let currentWindow = global.display.focus_window;
-            if (currentWindow)
-                currentWindow.unmake_fullscreen();
-        });
+        // EdgeDragAction (unfullscreen gesture) removed — unnecessary for
+        // single-workspace Surface GO setup; reduces touch event processing
 
-        let updateUnfullscreenGesture = () => {
-            let currentWindow = global.display.focus_window;
-            topDragAction.enabled = currentWindow && currentWindow.is_fullscreen();
-        };
-
-        global.display.connect('notify::focus-window', updateUnfullscreenGesture);
-        global.display.connect('in-fullscreen-changed', updateUnfullscreenGesture);
-        updateUnfullscreenGesture();
-
-        global.stage.add_action_full('unfullscreen', Clutter.EventPhase.CAPTURE, topDragAction);
-
+        // Single-workspace mode: create WorkspaceAnimationController but
+        // connect kill-switch-workspace for safety (mutter may still emit it)
         this._workspaceAnimation =
             new WorkspaceAnimation.WorkspaceAnimationController();
 
@@ -1629,7 +1603,9 @@ export class WindowManager {
     }
 
     _switchWorkspace(shellwm, from, to, direction) {
-        if (!Main.sessionMode.hasWorkspaces || !this._shouldAnimate()) {
+        // Single-workspace mode: complete immediately without animation
+        if (!Main.sessionMode.hasWorkspaces || !this._shouldAnimate() ||
+            global.workspace_manager.n_workspaces <= 1) {
             shellwm.completed_switch_workspace();
             return;
         }
@@ -1870,59 +1846,7 @@ export class WindowManager {
         }
     }
 
-    handleWorkspaceScroll(event) {
-        if (!this._canScroll)
-            return Clutter.EVENT_PROPAGATE;
-
-        if (event.type() !== Clutter.EventType.SCROLL)
-            return Clutter.EVENT_PROPAGATE;
-
-        const direction = event.get_scroll_direction();
-        if (direction === Clutter.ScrollDirection.SMOOTH)
-            return Clutter.EVENT_PROPAGATE;
-
-        const workspaceManager = global.workspace_manager;
-        const vertical = workspaceManager.layout_rows === -1;
-        const rtl = Clutter.get_default_text_direction() === Clutter.TextDirection.RTL;
-        const activeWs = workspaceManager.get_active_workspace();
-        let ws;
-        switch (direction) {
-        case Clutter.ScrollDirection.UP:
-            if (vertical)
-                ws = activeWs.get_neighbor(Meta.MotionDirection.UP);
-            else if (rtl)
-                ws = activeWs.get_neighbor(Meta.MotionDirection.RIGHT);
-            else
-                ws = activeWs.get_neighbor(Meta.MotionDirection.LEFT);
-            break;
-        case Clutter.ScrollDirection.DOWN:
-            if (vertical)
-                ws = activeWs.get_neighbor(Meta.MotionDirection.DOWN);
-            else if (rtl)
-                ws = activeWs.get_neighbor(Meta.MotionDirection.LEFT);
-            else
-                ws = activeWs.get_neighbor(Meta.MotionDirection.RIGHT);
-            break;
-        case Clutter.ScrollDirection.LEFT:
-            ws = activeWs.get_neighbor(Meta.MotionDirection.LEFT);
-            break;
-        case Clutter.ScrollDirection.RIGHT:
-            ws = activeWs.get_neighbor(Meta.MotionDirection.RIGHT);
-            break;
-        default:
-            return Clutter.EVENT_PROPAGATE;
-        }
-        this.actionMoveWorkspace(ws);
-
-        this._canScroll = false;
-        GLib.timeout_add(GLib.PRIORITY_DEFAULT,
-            SCROLL_TIMEOUT_TIME, () => {
-                this._canScroll = true;
-                return GLib.SOURCE_REMOVE;
-            });
-
-        return Clutter.EVENT_STOP;
-    }
+    // handleWorkspaceScroll removed — single-workspace mode, scroll-event is no-op
 
     _confirmDisplayChange() {
         let dialog = new DisplayChangeDialog(this._shellwm);

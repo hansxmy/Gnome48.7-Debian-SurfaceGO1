@@ -454,7 +454,7 @@ class ActivitiesButton extends PanelMenu.Button {
                 Main.overview.toggle();
         }
 
-        return Main.wm.handleWorkspaceScroll(event);
+        return Clutter.EVENT_PROPAGATE;
     }
 
     vfunc_key_release_event(event) {

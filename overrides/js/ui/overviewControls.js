@@ -397,7 +397,7 @@ class ControlsManager extends St.Widget {
                 this._thumbnailsBox.should_show ? 1 : 0, {
                     duration: SIDE_CONTROLS_ANIMATION_TIME,
                     mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-                    onComplete: () => this._updateThumbnailsBox(),
+                    onStopped: () => this._updateThumbnailsBox(),
                 });
         }, this);
 
@@ -654,7 +654,7 @@ class ControlsManager extends St.Widget {
             opacity: targetOpacity,
             duration: SIDE_CONTROLS_ANIMATION_TIME,
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-            onComplete: () => {
+            onStopped: () => {
                 this._thumbnailsBox.visible = thumbnailsBoxVisible;
                 if (!thumbnailsBoxVisible)
                     this._thumbnailsBox.expandFraction = 0.0;
@@ -799,7 +799,7 @@ class ControlsManager extends St.Widget {
             this._stateAdjustment.ease(finalState, {
                 duration: SIDE_CONTROLS_ANIMATION_TIME,
                 mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-                onComplete: () => {
+                onStopped: () => {
                     this.dash.showAppsButton.checked =
                         finalState === ControlsState.APP_GRID;
                 },

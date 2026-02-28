@@ -199,7 +199,7 @@ class DashItemContainer extends St.Widget {
             opacity: 0,
             duration: DASH_ITEM_LABEL_HIDE_TIME,
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-            onComplete: () => this.label.hide(),
+            onStopped: () => this.label.hide(),
         });
     }
 
