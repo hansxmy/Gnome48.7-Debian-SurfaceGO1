@@ -65,6 +65,7 @@ export class SniItem {
     #propSignalId = 0;
     #refreshTimeout = null;
 
+    #pendingTriggers = null;
     #onReady;
     #onIconChanged;
     #onStatusChanged;
@@ -94,6 +95,15 @@ export class SniItem {
     get title() { return this.#getString('Title') || this.id; }
     get status() { return this.#getString('Status') || 'Active'; }
     get menuPath() { return this.#getString('Menu') || '/MenuBar'; }
+
+    /** True when the item ONLY has a menu (click → menu). False means it
+     *  has a primary action (left-click → Activate, right-click → menu). */
+    get itemIsMenu() {
+        const v = this.#proxy?.get_cached_property('ItemIsMenu');
+        if (!v) return false;
+        try { return v.get_boolean(); }
+        catch { return false; }
+    }
 
     activate(x = 0, y = 0) {
         this.#proxy?.call('Activate',
@@ -164,7 +174,7 @@ export class SniItem {
         }
         if (this.#destroyed) { this.#proxy = null; return; }
 
-        this._pendingTriggers = new Set();
+        this.#pendingTriggers = new Set();
         this.#signalId = this.#proxy.connect('g-signal',
             (_p, _s, signal) => this.#scheduleRefresh(signal));
         this.#propSignalId = this.#proxy.connect('g-properties-changed',
@@ -175,13 +185,13 @@ export class SniItem {
 
     #scheduleRefresh(trigger) {
         if (this.#destroyed) return;
-        this._pendingTriggers.add(trigger);
+        this.#pendingTriggers.add(trigger);
         if (this.#refreshTimeout)
             clearTimeout(this.#refreshTimeout);
         this.#refreshTimeout = setTimeout(() => {
             this.#refreshTimeout = null;
-            const triggers = this._pendingTriggers;
-            this._pendingTriggers = new Set();
+            const triggers = this.#pendingTriggers;
+            this.#pendingTriggers = new Set();
             this.#doRefresh(triggers);
         }, 50);
     }

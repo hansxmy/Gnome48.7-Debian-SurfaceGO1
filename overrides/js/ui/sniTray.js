@@ -5,6 +5,7 @@
  * PanelMenu.Button for each registered tray application.
  * Icons are placed right-aligned in the panel.
  */
+import Clutter from 'gi://Clutter';
 import GObject from 'gi://GObject';
 import St from 'gi://St';
 
@@ -42,6 +43,31 @@ const SniTrayIcon = GObject.registerClass({
         this._item?.destroy();
         this._menuClient?.destroy();
         super.destroy();
+    }
+
+    /**
+     * Override PanelMenu.Button's default click handler.
+     * - Left-click + ItemIsMenu=false → Activate() (show/hide app window)
+     * - Right-click or ItemIsMenu=true → toggle dbusmenu
+     */
+    vfunc_event(event) {
+        const type = event.type();
+        if (type !== Clutter.EventType.BUTTON_PRESS &&
+            type !== Clutter.EventType.TOUCH_BEGIN)
+            return Clutter.EVENT_PROPAGATE;
+
+        const button = type === Clutter.EventType.BUTTON_PRESS
+            ? event.get_button() : Clutter.BUTTON_PRIMARY;
+
+        if (button === Clutter.BUTTON_PRIMARY && !this._item?.itemIsMenu) {
+            this._item?.activate();
+            return Clutter.EVENT_STOP;
+        }
+
+        // Right-click, middle-click, or ItemIsMenu → open menu
+        if (this.menu)
+            this.menu.toggle();
+        return Clutter.EVENT_STOP;
     }
 
     _onItemReady() {
