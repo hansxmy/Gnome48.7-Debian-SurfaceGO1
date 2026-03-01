@@ -161,7 +161,7 @@ class DashItemContainer extends St.Widget {
     }
 
     showLabel() {
-        if (!this._labelText)
+        if (!this._labelText || !this.label)
             return;
 
         this.label.set_text(this._labelText);
@@ -195,11 +195,11 @@ class DashItemContainer extends St.Widget {
     }
 
     hideLabel() {
-        this.label.ease({
+        this.label?.ease({
             opacity: 0,
             duration: DASH_ITEM_LABEL_HIDE_TIME,
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-            onStopped: () => this.label.hide(),
+            onStopped: () => this.label?.hide(),
         });
     }
 
@@ -229,7 +229,7 @@ class DashItemContainer extends St.Widget {
     }
 
     animateOutAndDestroy() {
-        this.label.hide();
+        this.label?.hide();
 
         if (this.child == null) {
             this.destroy();

@@ -187,6 +187,8 @@ export class ClipboardSync {
             (_obj, res) => {
                 if (this.#destroyed || !this.#enabled)
                     return;
+                // Clean up subscriptions from any prior racing callback
+                this.#unsubSignals();
                 try {
                     this.#proxy = Gio.DBusProxy.new_finish(res);
                 } catch (e) {
@@ -208,15 +210,25 @@ export class ClipboardSync {
                 this.#propChangedId = this.#proxy.connect(
                     'g-properties-changed', (_proxy, changed, _inv) => {
                         const v = changed.lookup_value('State', null);
-                        if (v)
-                            this.#setState(v.get_string()[0] || 'connected');
+                        if (v) {
+                            try {
+                                this.#setState(v.get_string()[0] || 'connected');
+                            } catch (_e) {
+                                this.#setState('error');
+                            }
+                        }
                     }
                 );
 
                 const cachedState = this.#proxy.get_cached_property('State');
-                const initialState = cachedState
-                    ? (cachedState.get_string()[0] || 'connected')
-                    : 'connecting';
+                let initialState = 'connecting';
+                if (cachedState) {
+                    try {
+                        initialState = cachedState.get_string()[0] || 'connected';
+                    } catch (_e) {
+                        initialState = 'error';
+                    }
+                }
                 this.#setState(initialState);
             }
         );

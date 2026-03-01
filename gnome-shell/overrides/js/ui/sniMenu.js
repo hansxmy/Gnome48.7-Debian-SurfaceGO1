@@ -100,7 +100,9 @@ export class SniMenuClient {
 
     #disconnect() {
         if (this.#signalId && this.#proxy) {
-            this.#proxy.disconnect(this.#signalId);
+            try {
+                this.#proxy.disconnect(this.#signalId);
+            } catch (_e) { /* proxy may already be disposed */ }
             this.#signalId = 0;
         }
         this.#proxy = null;

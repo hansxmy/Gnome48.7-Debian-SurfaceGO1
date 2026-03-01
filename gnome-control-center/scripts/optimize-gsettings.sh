@@ -18,22 +18,39 @@ DRY_RUN=0
 apply() {
   local schema="$1" key="$2" value="$3"
   local current
+
+  # 先检查 schema 是否存在，避免 gsettings set 出错导致脚本退出
+  if ! gsettings list-keys "$schema" &>/dev/null; then
+    echo "  [skip] $schema (schema not installed)"
+    return 0
+  fi
+
   current=$(gsettings get "$schema" "$key" 2>/dev/null || echo "(not available)")
+  if [ "$current" = "(not available)" ]; then
+    echo "  [skip] $schema $key (key not found)"
+    return 0
+  fi
   if [ "$current" = "$value" ]; then
     echo "  [skip] $schema $key = $value (already set)"
   elif [ "$DRY_RUN" = "1" ]; then
     echo "  [dry]  $schema $key: $current → $value"
   else
-    gsettings set "$schema" "$key" "$value"
-    echo "  [set]  $schema $key = $value"
+    if gsettings set "$schema" "$key" "$value" 2>/dev/null; then
+      echo "  [set]  $schema $key = $value"
+    else
+      echo "  [FAIL] $schema $key — gsettings set failed"
+    fi
   fi
 }
 
 echo "=== GNOME Shell 动画优化 ==="
 # 不完全关闭动画（关掉会导致部分过渡生硬），而是全局加速
-# GNOME 48 没有原生速度滑块，但 mutter 有 slow-down-factor
+# GNOME 48: slow-down-factor 在 org.gnome.mutter（非 .debug）schema 中
 # 0.75 = 比默认快 25%，视觉上更灵敏
+# 注: 如果 schema 不存在，apply() 会自动跳过
 apply org.gnome.desktop.interface enable-animations true
+apply org.gnome.mutter slow-down-factor 0.75
+# 兼容旧版 mutter（slow-down-factor 可能在 .debug schema）
 apply org.gnome.mutter.debug slow-down-factor 0.75
 
 echo ""

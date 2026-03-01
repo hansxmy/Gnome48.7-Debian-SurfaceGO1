@@ -42,6 +42,7 @@ struct _CcAboutPage
 
   AdwDialog       *system_details_window;
   guint            create_system_details_id;
+  GCancellable    *log_cancellable;
 };
 
 G_DEFINE_TYPE (CcAboutPage, cc_about_page, ADW_TYPE_NAVIGATION_PAGE)
@@ -127,17 +128,24 @@ on_log_save_finished (GObject      *source,
   GSubprocess *proc = G_SUBPROCESS (source);
   AdwDialog *dialog;
 
-  if (g_subprocess_wait_check_finish (proc, result, &error))
+  if (!g_subprocess_wait_check_finish (proc, result, &error))
     {
+      /* Cancelled — page was disposed, don't try to show dialog */
+      if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
+        {
+          log_save_data_free (data);
+          return;
+        }
+
       g_autofree char *body = g_strdup_printf (
-          "日志已保存至 ~/Downloads/%s", data->filename);
-      dialog = adw_alert_dialog_new ("日志已保存", body);
+          "收集日志失败: %s", error->message);
+      dialog = adw_alert_dialog_new ("错误", body);
     }
   else
     {
       g_autofree char *body = g_strdup_printf (
-          "收集日志失败: %s", error->message);
-      dialog = adw_alert_dialog_new ("错误", body);
+          "日志已保存至 ~/Downloads/%s", data->filename);
+      dialog = adw_alert_dialog_new ("日志已保存", body);
     }
 
   adw_alert_dialog_add_response (ADW_ALERT_DIALOG (dialog), "ok", "确定");
@@ -152,9 +160,17 @@ cc_about_page_download_logs (CcAboutPage *self)
   g_autofree char *timestamp = NULL;
   g_autofree char *downloads_dir = NULL;
   g_autofree char *cmd = NULL;
+  g_autofree char *quoted_path = NULL;
   g_autoptr(GError) error = NULL;
   g_autoptr(GSubprocess) proc = NULL;
   LogSaveData *data;
+
+  /* Cancel any in-progress log collection */
+  if (self->log_cancellable)
+    {
+      g_cancellable_cancel (self->log_cancellable);
+      g_clear_object (&self->log_cancellable);
+    }
 
   now = g_date_time_new_now_local ();
   timestamp = g_date_time_format (now, "%Y%m%d_%H%M%S");
@@ -167,6 +183,7 @@ cc_about_page_download_logs (CcAboutPage *self)
 
   g_mkdir_with_parents (downloads_dir, 0755);
 
+  quoted_path = g_shell_quote (data->filepath);
   cmd = g_strdup_printf (
       "{ "
       "echo '=== 系统信息 ==='; uname -a; echo; "
@@ -188,8 +205,8 @@ cc_about_page_download_logs (CcAboutPage *self)
       "dconf dump /org/gnome/mutter/ 2>/dev/null; echo; "
       "echo '=== 系统日志 (本次启动) ==='; "
       "journalctl --boot --no-pager -o short-precise; "
-      "} > '%s' 2>&1",
-      data->filepath);
+      "} > %s 2>&1",
+      quoted_path);
 
   proc = g_subprocess_new (G_SUBPROCESS_FLAGS_NONE,
                            &error,
@@ -202,7 +219,8 @@ cc_about_page_download_logs (CcAboutPage *self)
       return;
     }
 
-  g_subprocess_wait_check_async (proc, NULL, on_log_save_finished, data);
+  self->log_cancellable = g_cancellable_new ();
+  g_subprocess_wait_check_async (proc, self->log_cancellable, on_log_save_finished, data);
 }
 
 #if !defined(DISTRIBUTOR_LOGO) || defined(DARK_MODE_DISTRIBUTOR_LOGO)
@@ -267,6 +285,10 @@ cc_about_page_dispose (GObject *object)
   if (self->system_details_window)
     adw_dialog_force_close (self->system_details_window);
   g_clear_object (&self->system_details_window);
+
+  if (self->log_cancellable)
+    g_cancellable_cancel (self->log_cancellable);
+  g_clear_object (&self->log_cancellable);
 
   g_clear_handle_id (&self->create_system_details_id, g_source_remove);
 

@@ -39,7 +39,7 @@ export const ClipboardIndicator = GObject.registerClass({
         this._flushCache();
         this._destroyed = true;
         this.#clearTimeouts();
-        this.keyboard.destroy();
+        this.keyboard?.destroy();
         this.sync?.destroy();
         this._disconnectSelectionListener();
         super.destroy();
@@ -501,7 +501,10 @@ export const ClipboardIndicator = GObject.registerClass({
                         });
                 }),
                 // Safety timeout: prevents #refreshInProgress stuck forever
-                new Promise(resolve => setTimeout(() => resolve(null), 1500)),
+                new Promise(resolve => setTimeout(() => {
+                    console.warn('ClipboardIndicator: clipboard read timed out for', type);
+                    resolve(null);
+                }, 5000)),
             ]);
             if (result)
                 return result;
@@ -522,6 +525,8 @@ export const ClipboardIndicator = GObject.registerClass({
             menuItem.entry.asBytes());
 
         this._pasteKeypressTimeout = setTimeout(() => {
+            if (this._destroyed)
+                return;
             if (this.keyboard.purpose === Clutter.InputContentPurpose.TERMINAL) {
                 this.keyboard.press(Clutter.KEY_Control_L);
                 this.keyboard.press(Clutter.KEY_Shift_L);

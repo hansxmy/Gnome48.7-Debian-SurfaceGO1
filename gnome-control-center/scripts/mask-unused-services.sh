@@ -36,6 +36,12 @@ UNITS=(
   evolution-source-registry.service
 )
 
+# ── 权限检查 ──
+if [ "$(id -u)" -ne 0 ]; then
+  echo "错误: 请使用 sudo 运行此脚本" >&2
+  exit 1
+fi
+
 DEST="/etc/systemd/user"
 mkdir -p "$DEST"
 
@@ -44,14 +50,12 @@ if [ "${1:-}" = "--unmask" ]; then
   for u in "${UNITS[@]}"; do
     rm -fv "$DEST/$u"
   done
-  systemctl daemon-reload
-  echo "Done. Services will start on next login."
+  echo "Done. Services will start on next login (re-login required)."
 else
   echo "Masking unused gsd services..."
   for u in "${UNITS[@]}"; do
     ln -sfv /dev/null "$DEST/$u"
   done
-  systemctl daemon-reload
   echo "Done. Masked services will not start on next login."
   echo "Use '$0 --unmask' to revert."
 fi

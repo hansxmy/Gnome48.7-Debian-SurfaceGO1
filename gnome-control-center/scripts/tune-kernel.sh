@@ -9,13 +9,19 @@ set -euo pipefail
 # Strategy: PERFORMANCE > battery life
 #   • vm.swappiness=10    — 8GB 够用，尽量不换出
 #   • zram               — 压缩交换在内存中完成，避免 SSD 写入
-#   • i915 performance   — 不省电，要流畅
+#   • i915 performance   — 关闭 PSR 避免闪屏
 #   • 保留 Debian 默认 swap 分区 — 作为 zram 的后备
 #
 # Usage:
 #   sudo ./tune-kernel.sh           # apply
 #   sudo ./tune-kernel.sh --status  # show current values
 # ────────────────────────────────────────────────────────────────
+
+# ── 权限检查 (--status 也需要读取某些 root 文件) ──
+if [ "$(id -u)" -ne 0 ]; then
+  echo "错误: 请使用 sudo 运行此脚本" >&2
+  exit 1
+fi
 
 if [ "${1:-}" = "--status" ]; then
   echo "=== 当前内核参数 ==="
@@ -31,8 +37,8 @@ if [ "${1:-}" = "--status" ]; then
   zramctl 2>/dev/null || echo "(zramctl not found)"
   echo ""
   echo "=== i915 参数 ==="
-  for p in /sys/module/i915/parameters/{enable_fbc,enable_psr,enable_dc}; do
-    [ -f "$p" ] && echo "  $(basename $p) = $(cat $p)"
+  for p in /sys/module/i915/parameters/{enable_fbc,enable_psr}; do
+    [ -f "$p" ] && echo "  $(basename "$p") = $(cat "$p")"
   done
   exit 0
 fi
@@ -73,8 +79,10 @@ PERCENT=50
 PRIORITY=100
 EOF
 
-# 如果 zramswap 服务存在就重启
-if systemctl list-unit-files | grep -q zramswap; then
+# 如果 zram 已经在运行，跳过重复初始化
+if swapon --show=NAME,TYPE 2>/dev/null | grep -q 'zram'; then
+  echo "  zram 已在运行，跳过初始化"
+elif systemctl list-unit-files | grep -q zramswap; then
   systemctl enable zramswap
   systemctl restart zramswap
   echo "  zram 已配置: 4GB zstd, priority=100"
@@ -84,7 +92,7 @@ elif systemctl list-unit-files | grep -q 'systemd-zram-setup'; then
 else
   # 手动创建
   modprobe zram num_devices=1
-  echo zstd > /sys/block/zram0/comp_algorithm 2>/dev/null || echo lz4 > /sys/block/zram0/comp_algorithm
+  echo zstd > /sys/block/zram0/comp_algorithm 2>/dev/null || echo lz4 > /sys/block/zram0/comp_algorithm 2>/dev/null || echo "  警告: zram 不支持 zstd/lz4，使用默认算法"
   echo $((4 * 1024 * 1024 * 1024)) > /sys/block/zram0/disksize
   mkswap /dev/zram0
   swapon -p 100 /dev/zram0
@@ -97,8 +105,9 @@ if swapon --show | grep -q 'partition'; then
   swapoff -a
   swapon /dev/zram0 2>/dev/null || true
   # 注释掉 fstab 中的 swap 行防止重启恢复
-  sed -i '/\sswap\s/s/^/#/' /etc/fstab
-  echo "  swap 分区已关闭，fstab 已注释"
+  cp /etc/fstab /etc/fstab.bak.$(date +%s)
+  sed -i '/^[^#].*\sswap\s/s/^/#/' /etc/fstab
+  echo "  swap 分区已关闭，fstab 已注释（备份: /etc/fstab.bak.*）"
 fi
 
 echo "  8GB RAM + 4GB zram = 等效 12GB，无需 SSD swap"
@@ -109,22 +118,25 @@ echo "=== 3. i915 显卡参数 (性能优先) ==="
 # Surface GO 用 Intel HD Graphics 615 (Kaby Lake)
 # enable_fbc=1: 帧缓冲压缩 — 减少显存带宽，对性能有正面帮助
 # enable_psr=0: 面板自刷新 — 关闭，避免闪屏/延迟问题
-# enable_dc=0:  显示核心省电 — 关闭，保证渲染流畅
-cat > /etc/modprobe.d/i915-surfacego.conf <<'EOF'
+# enable_dc=1:  显示核心省电 — 保持默认，enable_dc=0 可能导致 GPU 挂起
+if lsmod 2>/dev/null | grep -q '^i915'; then
+  cat > /etc/modprobe.d/i915-surfacego.conf <<'EOF'
 # Surface GO i915: performance over power saving
-options i915 enable_fbc=1 enable_psr=0 enable_dc=0
+options i915 enable_fbc=1 enable_psr=0
 EOF
-
-echo "  enable_fbc=1 (帧缓冲压缩, 正面性能)"
-echo "  enable_psr=0 (关闭面板自刷新, 避免闪屏)"
-echo "  enable_dc=0  (关闭显示省电, 保证流畅)"
-echo "  → 需要重启生效"
+  echo "  enable_fbc=1 (帧缓冲压缩, 正面性能)"
+  echo "  enable_psr=0 (关闭面板自刷新, 避免闪屏)"
+  echo "  enable_dc   (保持默认, 不禁用以避免GPU挂起)"
+  echo "  → 需要重启生效"
+else
+  echo "  [skip] i915 模块未加载（非 Intel GPU 或未检测到）"
+fi
 
 echo ""
 echo "=== 4. I/O 调度器 ==="
 
 # SSD 默认使用 mq-deadline 或 none，确认一下
-SCHED=$(cat /sys/block/sda/queue/scheduler 2>/dev/null || cat /sys/block/nvme0n1/queue/scheduler 2>/dev/null || echo "unknown")
+SCHED=$(cat /sys/block/nvme0n1/queue/scheduler 2>/dev/null || cat /sys/block/sda/queue/scheduler 2>/dev/null || echo "unknown")
 echo "  当前 I/O 调度器: $SCHED"
 echo "  (SSD 推荐 mq-deadline 或 none，通常 Debian 默认已正确)"
 

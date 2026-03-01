@@ -433,6 +433,13 @@ class ActivitiesButton extends PanelMenu.Button {
             this);
 
         this._xdndTimeOut = 0;
+
+        this.connect('destroy', () => {
+            if (this._xdndTimeOut !== 0) {
+                GLib.source_remove(this._xdndTimeOut);
+                this._xdndTimeOut = 0;
+            }
+        });
     }
 
     handleDragOver(source, _actor, _x, _y, _time) {
@@ -478,7 +485,6 @@ class ActivitiesButton extends PanelMenu.Button {
         if (pickedActor === this && Main.overview.shouldToggleByCornerOrButton())
             Main.overview.toggle();
 
-        GLib.source_remove(this._xdndTimeOut);
         this._xdndTimeOut = 0;
         return GLib.SOURCE_REMOVE;
     }
@@ -722,6 +728,11 @@ class Panel extends St.Widget {
 
         // ── SNI tray (built-in, replaces appindicator extension) ──
         this._sniTray = new SniTray();
+
+        this.connect('destroy', () => {
+            this._sniTray?.destroy();
+            this._clipboardIndicator?.destroy();
+        });
     }
 
     vfunc_get_preferred_width(_forHeight) {

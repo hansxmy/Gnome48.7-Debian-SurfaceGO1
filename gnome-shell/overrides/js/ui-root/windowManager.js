@@ -1159,7 +1159,7 @@ export class WindowManager {
             } else {
                 let monitor = Main.layoutManager.monitors[actor.meta_window.get_monitor()];
                 if (!monitor) {
-                    this._minimizeWindowDone();
+                    this._minimizeWindowDone(shellwm, actor);
                     return;
                 }
                 xDest = monitor.x;
@@ -1227,7 +1227,7 @@ export class WindowManager {
                 let monitor = Main.layoutManager.monitors[actor.meta_window.get_monitor()];
                 if (!monitor) {
                     actor.show();
-                    this._unminimizeWindowDone();
+                    this._unminimizeWindowDone(shellwm, actor);
                     return;
                 }
                 actor.set_position(monitor.x, monitor.y);

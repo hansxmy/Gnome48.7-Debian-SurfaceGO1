@@ -210,6 +210,7 @@ export class Overview extends Signals.EventEmitter {
     _sessionUpdated() {
         const {hasOverview} = Main.sessionMode;
         if (!hasOverview) {
+            this._resetWindowSwitchTimeout();
             this.hide();
             this._destroyPersistentDash();
         }

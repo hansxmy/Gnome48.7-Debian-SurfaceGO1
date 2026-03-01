@@ -89,6 +89,10 @@ export class StatusNotifierWatcher {
 
     #onBusAcquired(conn) {
         this.#conn = conn;
+        if (!_ifaceInfo) {
+            console.error('SniWatcher: cannot register — introspect info unavailable');
+            return;
+        }
         this.#dbusId = conn.register_object(
             OBJ_PATH, _ifaceInfo,
             (_c, _s, _p, _i, method, params, invocation) =>

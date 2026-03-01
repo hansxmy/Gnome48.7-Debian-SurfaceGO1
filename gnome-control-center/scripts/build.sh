@@ -102,7 +102,7 @@ if [ "$RUN_TESTS" = "1" ]; then
   echo "RUN_TESTS=1 — running tests before packaging."
 else
   echo "RUN_TESTS=0 — skipping tests."
-  export DEB_BUILD_OPTIONS="${DEB_BUILD_OPTIONS:-nocheck}"
+  export DEB_BUILD_OPTIONS="${DEB_BUILD_OPTIONS:+$DEB_BUILD_OPTIONS }nocheck"
 fi
 
 echo ""
