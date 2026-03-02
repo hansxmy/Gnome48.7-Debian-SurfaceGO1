@@ -711,7 +711,7 @@ class ControlsManager extends St.Widget {
             if (radius > 0) {
                 for (const mask of this._cornerMasks) {
                     mask.style =
-                        `background-color: rgba(18,20,25,0.88); ` +
+                        `background-color: ${Overview.OVERVIEW_BG_COLOR}; ` +
                         `${mask._cornerStyleProp}: ${radius}px;`;
                     mask.visible = true;
                 }

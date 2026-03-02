@@ -4,7 +4,7 @@ set -euo pipefail
 # ────────────────────────────────────────────────────────────────
 # tune-kernel.sh — Kernel / system tuning for Surface GO (performance mode)
 #
-# Surface GO high-end: Pentium Gold 4415Y, 8GB RAM, 128GB NVMe SSD
+# Surface GO 1: Intel Pentium 4415Y, 8GB RAM, 64GB eMMC
 #
 # Strategy: PERFORMANCE > battery life
 #   • vm.swappiness=10    — 8GB 够用，尽量不换出
@@ -168,7 +168,7 @@ echo ""
 echo "=== 4. I/O 调度器 ==="
 
 # SSD 默认使用 mq-deadline 或 none，确认一下
-SCHED=$(cat /sys/block/nvme0n1/queue/scheduler 2>/dev/null || cat /sys/block/sda/queue/scheduler 2>/dev/null || echo "unknown")
+SCHED=$(cat /sys/block/mmcblk0/queue/scheduler 2>/dev/null || cat /sys/block/nvme0n1/queue/scheduler 2>/dev/null || cat /sys/block/sda/queue/scheduler 2>/dev/null || echo "unknown")
 echo "  当前 I/O 调度器: $SCHED"
 echo "  (SSD 推荐 mq-deadline 或 none，通常 Debian 默认已正确)"
 

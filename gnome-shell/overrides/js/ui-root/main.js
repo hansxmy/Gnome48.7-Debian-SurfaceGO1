@@ -113,6 +113,7 @@ Gio._promisify(Gio.File.prototype, 'touch_async');
 
 let _remoteAccessInhibited = false;
 let _workspaceSettings = null;
+let _wmPrefs = null;
 let _singleWorkspaceEnabled = false;
 
 function _enforceSingleWorkspaceCount() {
@@ -163,9 +164,15 @@ function _enableSingleWorkspaceMode() {
     });
 
     // Also enforce num-workspaces = 1 in WM preferences
-    const wmPrefs = new Gio.Settings({schema_id: 'org.gnome.desktop.wm.preferences'});
-    if (wmPrefs.get_int('num-workspaces') !== 1)
-        wmPrefs.set_int('num-workspaces', 1);
+    if (!_wmPrefs)
+        _wmPrefs = new Gio.Settings({schema_id: 'org.gnome.desktop.wm.preferences'});
+    if (_wmPrefs.get_int('num-workspaces') !== 1)
+        _wmPrefs.set_int('num-workspaces', 1);
+    // Guard against external tools changing num-workspaces
+    _wmPrefs.connect('changed::num-workspaces', () => {
+        if (_wmPrefs.get_int('num-workspaces') !== 1)
+            _wmPrefs.set_int('num-workspaces', 1);
+    });
 
     const workspaceManager = global.workspace_manager;
     workspaceManager.connect('notify::n-workspaces',

@@ -27,6 +27,10 @@ const PERSISTENT_DASH_MAX_HEIGHT_RATIO = 0.128;
 const PERSISTENT_DASH_BOTTOM_MARGIN = 8;
 const PERSISTENT_DASH_ANIMATION_TIME = 140;
 
+// Shared overview background colour — used here and in overviewControls.js
+// corner masks.  Keeping a single constant prevents mismatched tints.
+export const OVERVIEW_BG_COLOR = 'rgba(18,20,25,0.88)';
+
 const OverviewActor = GObject.registerClass(
 class OverviewActor extends St.BoxLayout {
     _init(sharedDash = null) {
@@ -38,7 +42,7 @@ class OverviewActor extends St.BoxLayout {
             orientation: Clutter.Orientation.VERTICAL,
             // Soften the pure-black stage edges — a very dark gray reduces
             // the harsh contrast around workspace previews.
-            style: 'background-color: rgba(18,20,25,0.88);',
+            style: `background-color: ${OVERVIEW_BG_COLOR};`,
         });
 
         this.add_constraint(new LayoutManager.MonitorConstraint({primary: true}));

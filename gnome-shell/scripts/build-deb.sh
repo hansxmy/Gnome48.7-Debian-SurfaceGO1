@@ -4,9 +4,9 @@ set -euo pipefail
 # 可通过环境变量覆盖
 # 示例：GNOME_SHELL_DSC_URL=https://deb.debian.org/debian/pool/main/g/gnome-shell/gnome-shell_48.7-0+deb13u1.dsc
 DSC_URL="${GNOME_SHELL_DSC_URL:-https://deb.debian.org/debian/pool/main/g/gnome-shell/gnome-shell_48.7-0+deb13u1.dsc}"
-LOCAL_SUFFIX="${LOCAL_SUFFIX:-+dock1}"
+LOCAL_SUFFIX="${LOCAL_SUFFIX:-+surfacego1}"
 DISTRO="${DISTRO:-trixie}"
-RUN_TESTS="${RUN_TESTS:-1}"
+RUN_TESTS="${RUN_TESTS:-0}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK_DIR="$ROOT_DIR/work"

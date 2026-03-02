@@ -49,6 +49,13 @@ export const ClipboardIndicator = GObject.registerClass({
         this.keyboard?.destroy();
         this.sync?.destroy();
         this._disconnectSelectionListener();
+        // Destroy orphaned emptyStateSection if it was removed from the
+        // Clutter tree (when clipboard has history items).  Without this
+        // the St.BoxLayout and its children leak until GC.
+        if (this.emptyStateSection) {
+            this.emptyStateSection.destroy();
+            this.emptyStateSection = null;
+        }
         super.destroy();
     }
 

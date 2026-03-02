@@ -41,11 +41,13 @@ echo "[3/6] GNOME/Mutter 关键设置..."
   echo "slow-down-factor=$(gsettings get org.gnome.mutter slow-down-factor 2>/dev/null || echo N/A)"
 } > "$OUTDIR/gsettings.txt"
 
-echo "[4/6] 当前启动日志..."
-journalctl -b --no-pager > "$OUTDIR/journal-boot.log" || true
-journalctl -b _COMM=gnome-shell --no-pager > "$OUTDIR/journal-gnome-shell.log" || true
-journalctl -b -u gdm --no-pager > "$OUTDIR/journal-gdm.log" || true
-journalctl -b -p warning..alert --no-pager > "$OUTDIR/journal-warn.log" || true
+echo "[4/6] 当前启动日志 (最近 5000 行)..."
+# Limit each journal dump to 5000 lines to avoid filling Surface GO's 64GB eMMC.
+# A multi-day session can produce 50-200MB of unbounded journal output.
+journalctl -b --no-pager -n 5000 > "$OUTDIR/journal-boot.log" || true
+journalctl -b _COMM=gnome-shell --no-pager -n 5000 > "$OUTDIR/journal-gnome-shell.log" || true
+journalctl -b -u gdm --no-pager -n 5000 > "$OUTDIR/journal-gdm.log" || true
+journalctl -b -p warning..alert --no-pager -n 5000 > "$OUTDIR/journal-warn.log" || true
 
 echo "[5/6] coredump 与会话状态..."
 coredumpctl list gnome-shell --no-pager > "$OUTDIR/coredump-list.txt" || true
