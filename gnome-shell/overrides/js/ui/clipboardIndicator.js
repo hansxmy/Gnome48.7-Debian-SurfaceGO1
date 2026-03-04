@@ -591,6 +591,10 @@ export const ClipboardIndicator = GObject.registerClass({
             menuItem.entry.mimetype(),
             menuItem.entry.asBytes());
 
+        // Clear BOTH timeouts — a rapid second paste must cancel the
+        // prior reset callback to avoid restoring stale clipboard content.
+        if (this._pasteResetTimeout)
+            clearTimeout(this._pasteResetTimeout);
         if (this._pasteKeypressTimeout)
             clearTimeout(this._pasteKeypressTimeout);
         this._pasteKeypressTimeout = setTimeout(() => {

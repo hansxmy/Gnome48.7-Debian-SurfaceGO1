@@ -382,10 +382,11 @@ export class Overview extends Signals.EventEmitter {
             GLib.source_remove(this._persistentDashIdleId);
             this._persistentDashIdleId = 0;
         }
-        // If a prior call left a pending deferred destroy, let it
-        // complete rather than cancelling it — the captured
-        // containerToDestroy closure needs to run removeChrome+destroy.
-        // (Cancelling would leak the old container in the Chrome layer.)
+        // If a prior call left a pending deferred destroy, its idle will
+        // still fire and clean up its captured containerToDestroy.  We
+        // intentionally do NOT cancel it — the captured closure needs to
+        // run removeChrome + destroy to avoid leaking the prior container
+        // in the Chrome layer.
 
         // Hide and make non-reactive BEFORE removing from the actor tree.
         // This prevents dnd.js _pickTargetActor from following a

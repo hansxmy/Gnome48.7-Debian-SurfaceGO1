@@ -152,14 +152,9 @@ export class ClipboardRegistry {
                 GLib.PRIORITY_LOW, null, (obj, res) => {
                     try {
                         const enumerator = obj.enumerate_children_finish(res);
-                        let info;
-                        while ((info = enumerator.next_file(null)) != null) {
-                            const child = folder.get_child(info.get_name());
-                            child.delete_async(
-                                GLib.PRIORITY_LOW, null, (f, r) => {
-                                    try { f.delete_finish(r); } catch (_e) { /* best-effort */ }
-                                });
-                        }
+                        // Use async enumeration to avoid blocking eMMC reads
+                        // on the main thread (Surface GO1).
+                        this._deleteNextBatch(folder, enumerator);
                     } catch (e) {
                         console.error('ClipboardRegistry: clear cache error', e);
                     }
@@ -167,6 +162,28 @@ export class ClipboardRegistry {
         } catch (e) {
             console.error('ClipboardRegistry: clear cache error', e);
         }
+    }
+
+    _deleteNextBatch(folder, enumerator) {
+        enumerator.next_files_async(10, GLib.PRIORITY_LOW, null,
+            (_enum, res) => {
+                try {
+                    const infos = _enum.next_files_finish(res);
+                    if (!infos || infos.length === 0)
+                        return;
+                    for (const info of infos) {
+                        const child = folder.get_child(info.get_name());
+                        child.delete_async(
+                            GLib.PRIORITY_LOW, null, (f, r) => {
+                                try { f.delete_finish(r); } catch (_e) { /* best-effort */ }
+                            });
+                    }
+                    // Continue with next batch
+                    this._deleteNextBatch(folder, enumerator);
+                } catch (e) {
+                    console.error('ClipboardRegistry: clear cache batch error', e);
+                }
+            });
     }
 }
 

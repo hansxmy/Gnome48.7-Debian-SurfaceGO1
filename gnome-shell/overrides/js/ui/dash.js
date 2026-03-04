@@ -392,6 +392,10 @@ export const Dash = GObject.registerClass({
         this._resetHoverTimeoutId = 0;
         this._labelShowing = false;
 
+        // Pre-allocate reusable ActorBox to avoid GBoxed allocations
+        // in _adjustIconSize.
+        this._iconSizeBox = new Clutter.ActorBox();
+
         super._init({
             name: 'dash',
             offscreen_redirect: Clutter.OffscreenRedirect.ALWAYS,
@@ -670,13 +674,9 @@ export const Dash = GObject.registerClass({
             return;
 
         const themeNode = this.get_theme_node();
-        const maxAllocation = new Clutter.ActorBox({
-            x1: 0,
-            y1: 0,
-            x2: this._maxWidth,
-            y2: 42, /* whatever */
-        });
-        let maxContent = themeNode.get_content_box(maxAllocation);
+        this._iconSizeBox.set_origin(0, 0);
+        this._iconSizeBox.set_size(this._maxWidth, 42);
+        let maxContent = themeNode.get_content_box(this._iconSizeBox);
         let availWidth = maxContent.x2 - maxContent.x1;
         let spacing = themeNode.get_length('spacing');
 

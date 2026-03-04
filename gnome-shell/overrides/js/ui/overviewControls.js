@@ -98,14 +98,14 @@ class ControlsManagerLayout extends Clutter.LayoutManager {
             outBox.set_size(...this._workAreaBox.get_size());
             break;
         case ControlsState.WINDOW_PICKER:
-            // Workspace fills the full available height — the dash floats on
-            // top at the bottom (z-ordered above the workspace display) so
-            // the overview feels larger, matching the user's preference.
+            // Official GNOME 48 layout: workspace box shrinks to make room
+            // for the dash at the bottom, matching upstream behaviour.
             outBox.set_origin(0,
                 startY + searchHeight + Math.round(spacing * THUMBNAILS_SPACING_ADJUSTMENT_TOP) +
                 thumbnailsHeight + Math.round(spacing * THUMBNAILS_SPACING_ADJUSTMENT_BOTTOM) * expandFraction);
             outBox.set_size(width,
                 height -
+                dashHeight - spacing -
                 searchHeight - Math.round(spacing * THUMBNAILS_SPACING_ADJUSTMENT_TOP) -
                 thumbnailsHeight - Math.round(spacing * THUMBNAILS_SPACING_ADJUSTMENT_BOTTOM) * expandFraction);
             break;
@@ -254,17 +254,23 @@ class ControlsManagerLayout extends Clutter.LayoutManager {
             const r = Math.round(
                 Util.lerp(initR, finalR, transitionParams.progress));
             if (r > 0) {
-                const [wx, wy] = workspacesBox.get_origin();
-                const [ww, wh] = workspacesBox.get_size();
-                const corners = [
-                    [wx, wy], [wx + ww - r, wy],
-                    [wx, wy + wh - r], [wx + ww - r, wy + wh - r],
-                ];
-                for (let i = 0; i < 4; i++) {
-                    childBox.set_origin(corners[i][0], corners[i][1]);
-                    childBox.set_size(r, r);
-                    this._cornerMasks[i].allocate(childBox);
-                }
+                const wx = workspacesBox.x1;
+                const wy = workspacesBox.y1;
+                const ww = workspacesBox.get_width();
+                const wh = workspacesBox.get_height();
+                // Top-left
+                childBox.set_origin(wx, wy);
+                childBox.set_size(r, r);
+                this._cornerMasks[0].allocate(childBox);
+                // Top-right
+                childBox.set_origin(wx + ww - r, wy);
+                this._cornerMasks[1].allocate(childBox);
+                // Bottom-left
+                childBox.set_origin(wx, wy + wh - r);
+                this._cornerMasks[2].allocate(childBox);
+                // Bottom-right
+                childBox.set_origin(wx + ww - r, wy + wh - r);
+                this._cornerMasks[3].allocate(childBox);
             }
         }
 
@@ -449,8 +455,8 @@ class ControlsManager extends St.Widget {
             this._cornerMasks.push(mask);
         }
 
-        // Z-order: workspace below dash so the dash floats visibly
-        // on top of the full-height workspace preview.
+        // Child order: appDisplay and workspacesDisplay first, then
+        // corner masks on top of workspace preview, then dash.
         this.add_child(this._appDisplay);
         this.add_child(this._workspacesDisplay);
         for (const mask of this._cornerMasks)

@@ -522,10 +522,10 @@ class ScreenShareIndicator extends SystemIndicator {
             if (handle.is_recording)
                 return;
             this._handles.add(handle);
-            handle.connect('stopped', () => {
+            handle.connectObject('stopped', () => {
                 this._handles.delete(handle);
                 this._sync();
-            });
+            }, this);
             this._sync();
         });
     }
