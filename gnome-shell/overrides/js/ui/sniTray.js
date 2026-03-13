@@ -60,7 +60,7 @@ const SniTrayIcon = GObject.registerClass({
             type !== Clutter.EventType.TOUCH_BEGIN)
             return Clutter.EVENT_PROPAGATE;
 
-        if (this.menu)
+        if (this.menu && this._menuClient)
             this.menu.toggle();
         return Clutter.EVENT_STOP;
     }

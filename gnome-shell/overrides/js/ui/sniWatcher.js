@@ -110,8 +110,16 @@ export class StatusNotifierWatcher {
             const sender = invocation.get_sender();
             const [service] = params.deep_unpack();
             this.#register(service, sender);
+            invocation.return_value(null);
+            return;
         }
-        invocation.return_value(null);
+        if (method === 'RegisterStatusNotifierHost') {
+            invocation.return_value(null);
+            return;
+        }
+        invocation.return_dbus_error(
+            'org.freedesktop.DBus.Error.UnknownMethod',
+            `Unknown method: ${method}`);
     }
 
     #handleGetProp(prop) {
@@ -135,6 +143,11 @@ export class StatusNotifierWatcher {
             busName = service;
             objPath = '/StatusNotifierItem';
         }
+
+        // Validate D-Bus name format to avoid GLib critical warnings
+        // from bus_watch_name and proxy creation with garbage input.
+        if (!busName || !/^:[A-Za-z0-9_.]+$|^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)+$/.test(busName))
+            return;
 
         const id = `${busName}${objPath}`;
         if (this.#items.has(id))

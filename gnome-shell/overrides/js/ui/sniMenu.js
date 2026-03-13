@@ -62,6 +62,7 @@ export class SniMenuClient {
     #signalId = 0;
     #openStateId = 0;
     #layoutFetched = false;
+    #pendingLayout = null;
 
     /**
      * @param {string} busName
@@ -74,7 +75,15 @@ export class SniMenuClient {
         this.#menu = popupMenu;
 
         this.#openStateId = this.#menu.connect('open-state-changed',
-            (_, open) => { if (open) this.#onMenuOpen(); });
+            (_, open) => {
+                if (open) {
+                    this.#onMenuOpen();
+                } else if (this.#pendingLayout) {
+                    const layout = this.#pendingLayout;
+                    this.#pendingLayout = null;
+                    this.#buildMenu(layout);
+                }
+            });
 
         this.#createProxy();
     }
@@ -172,13 +181,20 @@ export class SniMenuClient {
             new GLib.Variant('(iias)', [0, -1, []]),
             Gio.DBusCallFlags.NONE, 5000, null,
             (_p, res) => {
+                let result;
+                try {
+                    result = _p.call_finish(res);
+                } catch (_e) { return; }
                 if (this.#destroyed) return;
                 try {
-                    const result = _p.call_finish(res);
                     // Return type: (u(ia{sv}av))
                     const rootNode = result.get_child_value(1);
                     const layout = this.#parseNode(rootNode);
-                    this.#buildMenu(layout);
+                    if (this.#menu?.isOpen) {
+                        this.#pendingLayout = layout;
+                    } else {
+                        this.#buildMenu(layout);
+                    }
                     this.#layoutFetched = true;
                 } catch (e) {
                     console.error('SniMenu: GetLayout failed', e);
@@ -193,6 +209,7 @@ export class SniMenuClient {
      */
     #parseNode(node, depth = 0) {
         const MAX_DEPTH = 10;
+        const MAX_CHILDREN = 100;
         if (depth > MAX_DEPTH) {
             console.warn('SniMenu: menu tree exceeds max depth', MAX_DEPTH);
             return {id: -1, props: {}, children: []};
@@ -220,7 +237,7 @@ export class SniMenuClient {
         }
 
         const children = [];
-        const nChildren = childrenArr.n_children();
+        const nChildren = Math.min(childrenArr.n_children(), MAX_CHILDREN);
         for (let i = 0; i < nChildren; i++) {
             const cv = childrenArr.get_child_value(i).get_variant();
             children.push(this.#parseNode(cv, depth + 1));

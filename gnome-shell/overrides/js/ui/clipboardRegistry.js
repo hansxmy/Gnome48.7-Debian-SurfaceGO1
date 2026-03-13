@@ -79,7 +79,7 @@ export class ClipboardRegistry {
                     const registry = JSON.parse(
                         new TextDecoder().decode(contents));
                     const promises = registry.map(
-                        json => ClipboardEntry.fromJSON(json));
+                        json => ClipboardEntry.fromJSON(json, this.REGISTRY_DIR));
 
                     Promise.all(promises).then(entries => {
                         entries = entries.filter(e => e !== null);
@@ -200,7 +200,7 @@ export class ClipboardEntry {
             mimetype === 'UTF8_STRING';
     }
 
-    static async fromJSON(json) {
+    static async fromJSON(json, registryDir = null) {
         if (!json.contents)
             return null;
         const mimetype = json.mimetype || 'text/plain;charset=utf-8';
@@ -210,6 +210,11 @@ export class ClipboardEntry {
             bytes = new TextEncoder().encode(json.contents);
         } else {
             const filename = json.contents;
+            // Validate that cached image path is within the expected
+            // cache directory to prevent loading arbitrary files from
+            // a tampered registry.
+            if (registryDir && !filename.startsWith(registryDir + '/'))
+                return null;
             if (!GLib.file_test(filename, GLib.FileTest.EXISTS))
                 return null;
 

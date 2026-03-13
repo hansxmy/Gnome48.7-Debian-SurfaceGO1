@@ -524,7 +524,7 @@ export const ClipboardIndicator = GObject.registerClass({
             console.error('ClipboardIndicator: refresh error', e);
         } finally {
             this.#refreshInProgress = false;
-            if (this.#pendingRemoteClipboard) {
+            if (this.#pendingRemoteClipboard && !this._destroyed) {
                 const {mimetype, bytes} = this.#pendingRemoteClipboard;
                 this.#pendingRemoteClipboard = null;
                 // Re-set refreshInProgress BEFORE applying remote clipboard,
@@ -539,7 +539,7 @@ export const ClipboardIndicator = GObject.registerClass({
                     this.#refreshInProgress = false;
                 }
             }
-            if (this.#pendingLocalRefresh) {
+            if (this.#pendingLocalRefresh && !this._destroyed) {
                 this.#pendingLocalRefresh = false;
                 this._refreshIndicator().catch(
                     e => console.error('ClipboardIndicator: pending local:', e));
@@ -633,8 +633,11 @@ export const ClipboardIndicator = GObject.registerClass({
             clearTimeout(this._pasteResetTimeout);
         if (this._pasteKeypressTimeout)
             clearTimeout(this._pasteKeypressTimeout);
+        const targetWindow = global.display.focus_window;
         this._pasteKeypressTimeout = setTimeout(() => {
             if (this._destroyed) return;
+            if (!targetWindow || global.display.focus_window !== targetWindow)
+                return;
             this.#simulatePaste();
         }, 250);
     }
@@ -644,6 +647,7 @@ export const ClipboardIndicator = GObject.registerClass({
         this.menu.close();
         const selected = this.clipItemsRadioGroup.find(
             i => i.currentlySelected);
+        const targetWindow = global.display.focus_window;
 
         this.#selfTriggered = true;
         this._clipboard.set_content(
@@ -658,6 +662,8 @@ export const ClipboardIndicator = GObject.registerClass({
             clearTimeout(this._pasteKeypressTimeout);
         this._pasteKeypressTimeout = setTimeout(() => {
             if (this._destroyed) return;
+            if (!targetWindow || global.display.focus_window !== targetWindow)
+                return;
             this.#simulatePaste();
             this._pasteResetTimeout = setTimeout(() => {
                 if (this._destroyed) return;

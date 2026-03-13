@@ -202,9 +202,12 @@ export class SniItem {
             new GLib.Variant('(s)', [SNI_IFACE]),
             Gio.DBusCallFlags.NONE, 5000, null,
             (_p, res) => {
+                let result;
+                try {
+                    result = _p.call_finish(res);
+                } catch (_e) { return; }
                 if (this.#destroyed) return;
                 try {
-                    const result = _p.call_finish(res);
                     // Iterate the a{sv} dict without deep_unpack() to preserve
                     // GLib.Variant values — set_cached_property requires Variant,
                     // not JS native types.
