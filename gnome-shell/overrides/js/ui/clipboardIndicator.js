@@ -276,8 +276,13 @@ export const ClipboardIndicator = GObject.registerClass({
         menuItem.entry = entry;
 
         menuItem.connect('activate', () => {
-            this._selectMenuItem(menuItem);
-            this.#autoPaste();
+            if (menuItem.currentlySelected) {
+                // Already selected → paste
+                this.#pasteSelectedItem();
+            } else {
+                // Not selected → switch only (no paste)
+                this._selectMenuItem(menuItem);
+            }
         });
 
         menuItem.connect('key-focus-in', () => {
@@ -298,9 +303,13 @@ export const ClipboardIndicator = GObject.registerClass({
             }
             if (sym === Clutter.KEY_KP_Enter ||
                 sym === Clutter.KEY_Return) {
-                this._selectMenuItem(menuItem);
-                this.menu.close();
-                this.#autoPaste();
+                if (menuItem.currentlySelected) {
+                    this.menu.close();
+                    this.#pasteSelectedItem();
+                } else {
+                    this._selectMenuItem(menuItem);
+                    this.menu.close();
+                }
                 return Clutter.EVENT_STOP;
             }
             return Clutter.EVENT_PROPAGATE;
@@ -627,19 +636,22 @@ export const ClipboardIndicator = GObject.registerClass({
         }
     }
 
-    /** Auto-paste after click/Enter: permanently selects the item. */
-    #autoPaste() {
+    /**
+     * Paste the currently-selected clipboard item.
+     * Called when user clicks/taps an already-selected entry.
+     * The menu auto-closes from the 'activate' signal; we wait
+     * for focus to return to the application window before sending
+     * the key combo.
+     */
+    #pasteSelectedItem() {
         if (this._pasteResetTimeout)
             clearTimeout(this._pasteResetTimeout);
         if (this._pasteKeypressTimeout)
             clearTimeout(this._pasteKeypressTimeout);
-        const targetWindow = global.display.focus_window;
         this._pasteKeypressTimeout = setTimeout(() => {
             if (this._destroyed) return;
-            if (!targetWindow || global.display.focus_window !== targetWindow)
-                return;
             this.#simulatePaste();
-        }, 250);
+        }, 200);
     }
 
     /** Quick-paste via 'v' key without changing selection. */
@@ -647,7 +659,6 @@ export const ClipboardIndicator = GObject.registerClass({
         this.menu.close();
         const selected = this.clipItemsRadioGroup.find(
             i => i.currentlySelected);
-        const targetWindow = global.display.focus_window;
 
         this.#selfTriggered = true;
         this._clipboard.set_content(
@@ -662,9 +673,8 @@ export const ClipboardIndicator = GObject.registerClass({
             clearTimeout(this._pasteKeypressTimeout);
         this._pasteKeypressTimeout = setTimeout(() => {
             if (this._destroyed) return;
-            if (!targetWindow || global.display.focus_window !== targetWindow)
-                return;
             this.#simulatePaste();
+            // Restore previous clipboard selection
             this._pasteResetTimeout = setTimeout(() => {
                 if (this._destroyed) return;
                 if (selected?.entry &&
@@ -677,7 +687,7 @@ export const ClipboardIndicator = GObject.registerClass({
                     this.#selfTriggered = false;
                 }
             }, 500);
-        }, 250);
+        }, 200);
     }
 
     // ──────────────────────── Cleanup ────────────────────────

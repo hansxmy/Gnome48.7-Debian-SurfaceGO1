@@ -17,7 +17,7 @@ import * as WindowManager from './windowManager.js';
 import * as WorkspaceThumbnail from './workspaceThumbnail.js';
 import * as WorkspacesView from './workspacesView.js';
 
-export const SMALL_WORKSPACE_RATIO = 0.15;
+export const SMALL_WORKSPACE_RATIO = 0.364;
 const DASH_MAX_HEIGHT_RATIO = 0.16;
 const VERTICAL_SPACING_RATIO = 0.02;
 const THUMBNAILS_SPACING_ADJUSTMENT_TOP = 0.6;
@@ -109,10 +109,17 @@ class ControlsManagerLayout extends Clutter.LayoutManager {
                 searchHeight - Math.round(spacing * THUMBNAILS_SPACING_ADJUSTMENT_TOP) -
                 thumbnailsHeight - Math.round(spacing * THUMBNAILS_SPACING_ADJUSTMENT_BOTTOM) * expandFraction);
             break;
-        case ControlsState.APP_GRID:
-            outBox.set_origin(0, startY + searchHeight + spacing);
-            outBox.set_size(width, Math.round(height * SMALL_WORKSPACE_RATIO));
+        case ControlsState.APP_GRID: {
+            const previewHeight = Math.round(height * SMALL_WORKSPACE_RATIO);
+            const [waWidth, waHeight] = this._workAreaBox.get_size();
+            const previewWidth = waHeight > 0
+                ? Math.round(previewHeight * (waWidth / waHeight))
+                : width;
+            const xOrigin = Math.round((width - previewWidth) / 2);
+            outBox.set_origin(xOrigin, startY + searchHeight + spacing);
+            outBox.set_size(previewWidth, previewHeight);
             break;
+        }
         }
     }
 
@@ -175,11 +182,13 @@ class ControlsManagerLayout extends Clutter.LayoutManager {
             availableHeight -= searchHeight + spacing;
         }
 
-        // Dash — only compute dashHeight when the dash is parented here.
+        // Dash height computation.
+        // When the dash is a child of this container (standard mode),
+        // compute its height and allocate it at the bottom.
         // When the persistent-dash feature is active (overview.js), the
-        // dash lives in a separate Chrome container, so we must NOT
-        // subtract its height from the available space for workspaces
-        // and the app grid.
+        // dash lives in a separate Chrome container — we must NOT
+        // allocate it here, but still need its height so the workspace
+        // preview in WINDOW_PICKER doesn't extend behind the dock.
         let dashHeight = 0;
         if (this._dash.get_parent() === container) {
             const maxDashHeight = Math.round(box.get_height() * DASH_MAX_HEIGHT_RATIO);
@@ -193,6 +202,17 @@ class ControlsManagerLayout extends Clutter.LayoutManager {
             childBox.set_origin(0, startY + height - dashHeight);
             childBox.set_size(width, dashHeight);
             this._dash.allocate(childBox);
+        } else {
+            // Persistent dash: query its height for layout calculations
+            // without allocating (it's managed by the Chrome layer).
+            const maxDashHeight = Math.round(box.get_height() * DASH_MAX_HEIGHT_RATIO);
+            try {
+                this._dash.setMaxSize(width, maxDashHeight);
+                [, dashHeight] = this._dash.get_preferred_height(width);
+                dashHeight = Math.min(dashHeight, maxDashHeight);
+            } catch (_e) {
+                dashHeight = 0;
+            }
         }
 
         availableHeight -= dashHeight + spacing;
@@ -242,7 +262,7 @@ class ControlsManagerLayout extends Clutter.LayoutManager {
         // Corner masks for rounded workspace preview in APP_GRID
         if (this._cornerMasks) {
             const initR = 0;
-            const finalR = 0;
+            const finalR = 24;
             const r = Math.round(
                 Util.lerp(initR, finalR, transitionParams.progress));
             if (r > 0) {
@@ -729,7 +749,7 @@ class ControlsManager extends St.Widget {
         // _workspacesDisplay because clip_to_allocation + border-radius
         // does not clip child content to a rounded rectangle in St.
         const initialRadius = 0;
-        const finalRadius = 0;
+        const finalRadius = 24;
         const radius = Math.round(
             Util.lerp(initialRadius, finalRadius, params.progress));
         if (radius !== this._lastCornerRadius) {
