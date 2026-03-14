@@ -30,7 +30,7 @@ export class ClipboardKeyboard {
         if (this.#device) {
             try {
                 const time = GLib.get_monotonic_time();
-                for (const key of [Clutter.KEY_Control_L, Clutter.KEY_Shift_L, Clutter.KEY_Insert, Clutter.KEY_v])
+                for (const key of [Clutter.KEY_Control_L, Clutter.KEY_Shift_L, Clutter.KEY_v])
                     this.#device.notify_keyval(time, key, Clutter.KeyState.RELEASED);
             } catch (_e) { /* best-effort */ }
             this.#device.run_dispose();
@@ -45,9 +45,9 @@ export class ClipboardKeyboard {
     press(key) {
         if (!this.#device) return;
         try {
-            const time = Clutter.get_current_event_time();
-            const timeUs = time > 0 ? time * 1000 : GLib.get_monotonic_time();
-            this.#device.notify_keyval(timeUs, key, Clutter.KeyState.PRESSED);
+            this.#device.notify_keyval(
+                Clutter.get_current_event_time() * 1000,
+                key, Clutter.KeyState.PRESSED);
         } catch (e) {
             console.error('ClipboardKeyboard.press:', e);
         }
@@ -56,9 +56,9 @@ export class ClipboardKeyboard {
     release(key) {
         if (!this.#device) return;
         try {
-            const time = Clutter.get_current_event_time();
-            const timeUs = time > 0 ? time * 1000 : GLib.get_monotonic_time();
-            this.#device.notify_keyval(timeUs, key, Clutter.KeyState.RELEASED);
+            this.#device.notify_keyval(
+                Clutter.get_current_event_time() * 1000,
+                key, Clutter.KeyState.RELEASED);
         } catch (e) {
             console.error('ClipboardKeyboard.release:', e);
         }

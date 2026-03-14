@@ -235,8 +235,9 @@ export const ClipboardIndicator = GObject.registerClass({
     _onRemoteClipboard(mimetype, bytes) {
         if (!this._menuReady || this._destroyed)
             return;
-        if (this.#refreshInProgress) {
-            // Defer until current refresh completes to avoid race with local read
+        if (this.#refreshInProgress || this.#pasteInProgress) {
+            // Defer until current refresh/paste completes to avoid
+            // overwriting clipboard content that is about to be pasted.
             this.#pendingRemoteClipboard = {mimetype, bytes};
             return;
         }
@@ -630,10 +631,20 @@ export const ClipboardIndicator = GObject.registerClass({
     }
 
     #simulatePaste() {
-        this.keyboard.press(Clutter.KEY_Shift_L);
-        this.keyboard.press(Clutter.KEY_Insert);
-        this.keyboard.release(Clutter.KEY_Insert);
-        this.keyboard.release(Clutter.KEY_Shift_L);
+        if (!this.keyboard) return;
+        if (this.keyboard.purpose === Clutter.InputContentPurpose.TERMINAL) {
+            this.keyboard.press(Clutter.KEY_Control_L);
+            this.keyboard.press(Clutter.KEY_Shift_L);
+            this.keyboard.press(Clutter.KEY_v);
+            this.keyboard.release(Clutter.KEY_v);
+            this.keyboard.release(Clutter.KEY_Shift_L);
+            this.keyboard.release(Clutter.KEY_Control_L);
+        } else {
+            this.keyboard.press(Clutter.KEY_Control_L);
+            this.keyboard.press(Clutter.KEY_v);
+            this.keyboard.release(Clutter.KEY_v);
+            this.keyboard.release(Clutter.KEY_Control_L);
+        }
     }
 
     /**
@@ -644,8 +655,19 @@ export const ClipboardIndicator = GObject.registerClass({
      * before we send the virtual key press.
      */
     #pasteSelectedItem() {
+        const selected = this.clipItemsRadioGroup.find(
+            i => i.currentlySelected);
+        if (!selected) return;
+
         this.menu.close();
         this.#pasteInProgress = true;
+
+        // Re-set clipboard content to guarantee it matches the selected
+        // entry — another app may have taken ownership between selection
+        // and this paste click.
+        this.#setClipboardContent(
+            selected.entry.mimetype(), selected.entry.asBytes());
+
         if (this._pasteResetTimeout)
             clearTimeout(this._pasteResetTimeout);
         if (this._pasteKeypressTimeout)
@@ -654,7 +676,7 @@ export const ClipboardIndicator = GObject.registerClass({
             this.#pasteInProgress = false;
             if (this._destroyed) return;
             this.#simulatePaste();
-        }, 50);
+        }, 250);
     }
 
     /** Quick-paste via 'v' key without changing selection. */
@@ -686,7 +708,7 @@ export const ClipboardIndicator = GObject.registerClass({
                         selected.entry.asBytes());
                 }
             }, 500);
-        }, 50);
+        }, 250);
     }
 
     // ──────────────────────── Cleanup ────────────────────────

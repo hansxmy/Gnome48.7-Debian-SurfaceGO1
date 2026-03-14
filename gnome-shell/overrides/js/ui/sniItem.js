@@ -248,6 +248,9 @@ export class SniItem {
         if (!basePath.startsWith('/') ||
             !GLib.file_test(basePath, GLib.FileTest.IS_DIR))
             return null;
+        // Reject icon names with path separators to prevent traversal
+        if (iconName.includes('/') || iconName.includes('..'))
+            return null;
         const exts = ['svg', 'png'];
         // Direct file in base path
         for (const ext of exts) {
