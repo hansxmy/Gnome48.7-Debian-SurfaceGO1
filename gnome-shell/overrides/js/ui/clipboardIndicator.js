@@ -309,7 +309,6 @@ export const ClipboardIndicator = GObject.registerClass({
             if (sym === Clutter.KEY_KP_Enter ||
                 sym === Clutter.KEY_Return) {
                 if (menuItem.currentlySelected) {
-                    this.menu.close();
                     this.#pasteSelectedItem();
                 } else {
                     this._selectMenuItem(menuItem);
@@ -640,16 +639,19 @@ export const ClipboardIndicator = GObject.registerClass({
     /**
      * Paste the currently-selected clipboard item.
      * Called when user clicks/taps an already-selected entry.
-     * The menu auto-closes from the 'activate' signal; we wait
-     * for focus to return to the application window before sending
-     * the key combo.
+     * Explicitly close the menu FIRST to release the Wayland grab
+     * so the compositor restores focus to the previous window
+     * before we send the virtual key press.
      */
     #pasteSelectedItem() {
+        this.menu.close();
+        this.#pasteInProgress = true;
         if (this._pasteResetTimeout)
             clearTimeout(this._pasteResetTimeout);
         if (this._pasteKeypressTimeout)
             clearTimeout(this._pasteKeypressTimeout);
         this._pasteKeypressTimeout = setTimeout(() => {
+            this.#pasteInProgress = false;
             if (this._destroyed) return;
             this.#simulatePaste();
         }, 50);
